@@ -1,25 +1,19 @@
 ﻿from __future__ import print_function, absolute_import, unicode_literals
 
-import time
-import swagger_client
-from swagger_client.rest import ApiException
+import argparse
+# Import for encoding data as base64.
+import base64
+import sys
 from pprint import pprint
-
-# Import for parsing JSON.
-import json
 
 # Import for encoding data using CBOR.
 import cbor
-
-# Import for encoding data as base64.
-import base64
-
+from fido2.client import Fido2Client
 # Imports for FIDO2 py-lib.
 from fido2.hid import CtapHidDevice
-from fido2.client import Fido2Client
-from fido2.attestation import Attestation
-from getpass import getpass
-import sys
+
+import swagger_client
+from swagger_client.rest import ApiException
 
 # create an instance of the API class
 api_instance = swagger_client.RegistrationApi(swagger_client.ApiClient(swagger_client.Configuration()))
@@ -39,8 +33,8 @@ def testStartRegistration():
         # Call the API for creating a FIDO challenge for register operation.
         api_response = api_instance.start_registration(body)
         pprint(api_response)
-
         print(api_response.challenge)
+
     except ApiException as e:
         print("Exception when calling TestApi->start_registration: %s\n" % e)
 
@@ -93,9 +87,9 @@ def generateValidAttestationObject(authData):
 def getBytesFromBase64String(sBase64StringToDecode):
     # Check if padding characters are omitted from base64-encoded string.
     iPaddingCharCount = 0
-    if (len(sBase64StringToDecode) % 4 != 0):
+    if len(sBase64StringToDecode) % 4 != 0:
         # Determine how many padding characters to concatenate.
-        if ((len(sBase64StringToDecode) + 1) % 4 == 0):
+        if (len(sBase64StringToDecode) + 1) % 4 == 0:
             # Only missing one padding character.
             iPaddingCharCount = 1
         else:
@@ -116,8 +110,7 @@ def getBytesFromBase64String(sBase64StringToDecode):
     return decodedBytes
 
 
-def generateFIDORegistrationResponse(sRpId, sRpName, sUserId, sUserName, sUserDisplayName, sChallenge,
-                                     pubKeyCredParams):
+def generateFIDORegistrationResponse(sRpId, sRpName, sUserId, sUserName, sChallenge, pubKeyCredParams):
     use_nfc = False
     # Locate a device.
 
@@ -145,18 +138,23 @@ def generateFIDORegistrationResponse(sRpId, sRpName, sUserId, sUserName, sUserDi
     # Set request details for generating response from authenticator.
     # Get user ID as decoded bytes.
     # Printing user ID here as need to pass it back with authentication response.
-    print("User ID: " + sUserId + ".")
+    print("User ID: " + sUserId)
     decodedUserIdBytes = getBytesFromBase64String(sUserId)
     user = {"id": decodedUserIdBytes, "name": sUserName}
     algo = pubKeyCredParams[0]["alg"]  # ES256/-7
     challenge = sChallenge
 
-    # Set PIN for authenticator.
-    pin = "1234"
+    # Prompt for Authenticator PIN if needed
+    # pin = None
+    # if client.info.options.get("clientPin"):
+    #     pin = getpass("Please enter PIN: ")
+    # else:
+    #     print("No pin")
 
     # Create a credential.
     if not use_nfc:
         print("\nTouch your authenticator device now...\n")
+
     attestation_object, client_data = client.make_credential(rp, user, challenge, algos=[algo], pin=pin)
 
     return attestation_object, client_data
@@ -168,7 +166,6 @@ def createRegistrationResponseJSON(registrationRequest):
                                                                        registrationRequest.rp.name,
                                                                        registrationRequest.user.id,
                                                                        registrationRequest.user.name,
-                                                                       registrationRequest.user.display_name,
                                                                        registrationRequest.challenge,
                                                                        registrationRequest.pub_key_cred_params)
 
@@ -183,7 +180,6 @@ def createRegistrationResponseJSON(registrationRequest):
 
     # Create JSON registration response to send back to server.
     sRegResponse = "{'id':'" + sCredId + "','type':'public-key', 'response':{'attestationObject':'" + attestationObject + "','clientDataJSON':'" + clientDataJson + "'},'clientExtensionResults':{}}"
-
     return sRegResponse
 
 
@@ -191,17 +187,24 @@ def finishRegistrationOperation(registrationResponseJSON):
     try:
         # Call the API for creating a FIDO challenge for register operation.
         api_response = api_instance.finish_registration(registrationResponseJSON)
-
         return api_response
     except ApiException as e:
         print("Exception when calling TestApi->finish_registration: %s\n" % e)
 
 
 if __name__ == '__main__':
-    registrationRequest = initFidoRegistration("ruhma@metrarc.com", "Ruhma Tahir")
-    # sRegResponse = createRegistrationResponseJSON(registrationRequest)
-    # serverResult = finishRegistrationOperation(sRegResponse)
-    # if serverResult.status == "ok":
-    #     print("Registration success.")
-    # else:
-    #     print("Registration failed.")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("name", help="User's email address", default="ruhma@metrarc.com")
+    parser.add_argument("displayName", help="User's Display Name", default="Ruhma Tahir")
+    parser.add_argument("pin", help="Authenticator's PIN", default="1234")
+    args = parser.parse_args()
+
+    pin = args.pin
+
+    registrationRequest = initFidoRegistration(args.name, args.displayName)
+    sRegResponse = createRegistrationResponseJSON(registrationRequest)
+    serverResult = finishRegistrationOperation(sRegResponse)
+    if serverResult.status == "ok":
+        print("Registration success.")
+    else:
+        print("Registration failed.")
