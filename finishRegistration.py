@@ -1,59 +1,18 @@
 ﻿from __future__ import print_function, absolute_import, unicode_literals
 
 import argparse
-# Import for encoding data as base64.
 import base64
 import sys
 from pprint import pprint
-
-# Import for encoding data using CBOR.
 import cbor
 from fido2.client import Fido2Client
-# Imports for FIDO2 py-lib.
 from fido2.hid import CtapHidDevice
-
+import startRegistration
 import swagger_client
 from swagger_client.rest import ApiException
 
 # create an instance of the API class
 api_instance = swagger_client.RegistrationApi(swagger_client.ApiClient(swagger_client.Configuration()))
-
-
-def testStartRegistration():
-    bDidApiSucceed = False
-
-    # create an instance of the API class
-    api_instance = swagger_client.RegistrationApi(swagger_client.ApiClient(swagger_client.Configuration()))
-
-    # Create body for API.
-    # For server JSON parser, it needs single quotes in JSON string.
-    body = "{'username':'test_user_name','displayName':'test_user_display_name'}"
-
-    try:
-        # Call the API for creating a FIDO challenge for register operation.
-        api_response = api_instance.start_registration(body)
-        pprint(api_response)
-        print(api_response.challenge)
-
-    except ApiException as e:
-        print("Exception when calling TestApi->start_registration: %s\n" % e)
-
-    return bDidApiSucceed
-
-
-def initFidoRegistration(sUsername, sDisplayName):
-    # Create body for API.
-    # For server JSON parser, it needs single quotes in JSON string.
-    body = "{'username':'" + sUsername + "','displayName':'" + sDisplayName + "'}"
-
-    try:
-        # Call the API for creating a FIDO challenge for register operation.
-        api_response = api_instance.start_registration(body)
-        pprint(api_response)
-
-        return api_response
-    except ApiException as e:
-        print("Exception when calling TestApi->start_registration: %s\n" % e)
 
 
 def encodeDataForServer(dataToEncode):
@@ -201,11 +160,14 @@ if __name__ == '__main__':
 
     pin = args.pin
 
-    registrationRequest = initFidoRegistration(args.name, args.displayName)
-    print(registrationRequest)
-    # sRegResponse = createRegistrationResponseJSON(registrationRequest)
-    # serverResult = finishRegistrationOperation(sRegResponse)
-    # if serverResult.status == "ok":
-    #     print("Registration success.")
-    # else:
-    #     print("Registration failed.")
+    registrationRequest = startRegistration.initFidoRegistration(args.name, args.displayName)
+
+    # createRegistrationResponseJSON function should actually run on VCHolder and return the Attestation Object
+    sRegResponse = createRegistrationResponseJSON(registrationRequest)
+    print(type(sRegResponse))
+    print(sRegResponse)
+    serverResult = finishRegistrationOperation(sRegResponse)
+    if serverResult.status == "ok":
+        print("Registration success.")
+    else:
+        print("Registration failed.")
