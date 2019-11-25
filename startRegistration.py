@@ -28,6 +28,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     registrationRequest = initFidoRegistration(args.name, args.displayName)
-    print(type(registrationRequest))
+    # print(type(registrationRequest))
     print(registrationRequest)
 
